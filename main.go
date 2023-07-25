@@ -7,7 +7,7 @@ import (
 
 func main() {
 	//s := "go is awesome, php is not"
-	s := "in a coat of gold or a coat of red"
+	s := "in a coat of gold or a coat of red a"
 	w := wc.MakeWords(s)
 
 	fmt.Println(w.Index("a"))

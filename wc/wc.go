@@ -2,6 +2,7 @@ package wc
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -61,29 +62,32 @@ func WordCountAllocate(s string) Counter {
 }
 
 type Words struct {
-	//str string
 	str map[int]string
 }
 
 func MakeWords(s string) Words {
-	//return Words{s}
 	words := strings.Fields(s)
-	length := len(words)
-	w := Words{make(map[int]string, length)}
+	wordsMap := make(map[int]string, len(words))
 
 	for key, word := range words {
-		w.str[key] = word
+		wordsMap[key] = word
 	}
 
-	return w
+	return Words{wordsMap}
 }
 
 func (w Words) Index(word string) int {
-	//words := strings.Fields(w.str)
+	var keys []int
 	for key, val := range w.str {
 		if val == word {
-			return key
+			keys = append(keys, key)
 		}
+	}
+
+	length := len(keys)
+	if length > 0 {
+		sort.Ints(keys)
+		return keys[0]
 	}
 
 	return -1
