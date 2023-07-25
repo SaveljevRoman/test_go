@@ -2,7 +2,6 @@ package wc
 
 import (
 	"regexp"
-	"sort"
 	"strings"
 )
 
@@ -77,20 +76,20 @@ func MakeWords(s string) Words {
 }
 
 func (w Words) Index(word string) int {
-	var keys []int
+	res := -1
 	for key, val := range w.str {
 		if val == word {
-			keys = append(keys, key)
+			if res == -1 {
+				res = key
+			}
+
+			if res > key {
+				res = key
+			}
 		}
 	}
 
-	length := len(keys)
-	if length > 0 {
-		sort.Ints(keys)
-		return keys[0]
-	}
-
-	return -1
+	return res
 }
 
 /*// Words represents words in a string.
