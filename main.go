@@ -2,69 +2,64 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"strings"
 	"sync"
-	"time"
+	"unicode"
 )
 
-func main() {
+// counter stores the number of digits in each word.
+// each key is a word and value is the number of digits in the word.
+type counter map[string]int
+
+// countDigitsInWords counts digits in pharse words
+func countDigitsInWords(phrase string) counter {
+	words := strings.Fields(phrase)
+	syncStats := sync.Map{}
+
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go say(&wg, 1, "go is awesome")
+	wg.Add(len(words))
 
-	wg.Add(2)
-	go say(&wg, 2, "cats are cute")
-	wg.Wait()
-}
-
-func say(wg *sync.WaitGroup, id int, phrase string) {
-	for _, word := range strings.Fields(phrase) {
-		fmt.Printf("Worker #%d says: %s...\n", id, word)
-		dur := time.Duration(rand.Intn(100)) * time.Microsecond
-		time.Sleep(dur)
+	for _, word := range words {
+		go func(w string) {
+			defer wg.Done()
+			syncStats.Store(w, countDigits(w))
+		}(word)
 	}
-	wg.Done()
+	wg.Wait()
+
+	return asStats(&syncStats)
 }
 
-//Горутины
-//ф-ия main() является горутиной!!!
-//При завершении main завершаются и все остальные горутины, поэтому в примере пишем sleep
-//Чтобы вызвать метод асинхронно необходимо перед вызовом метода написать go
-//func main() {
-//	go say(1, "go is awesome")
-//	go say(2, "cats are cute")
-//	time.Sleep(500 * time.Microsecond)
-//}
+// countDigits returns the number of digits in a string
+func countDigits(str string) int {
+	count := 0
+	for _, char := range str {
+		if unicode.IsDigit(char) {
+			count++
+		}
+	}
+	return count
+}
 
-//Группа ожидания
-//Чтобы объявить счетчик в группе ожидания нужно - var wg sync.WaitGroup
-//	увеличивает счетчик - wg.Add(1)
-//	уменьшает счетчик на единицу - wg.Done()
-//  блокирование горутины, до тех пор пока счетчик не обнулится - wg.Wait()
-// Пример
-// defer и анонимная ф-ия - используется для отделения асинхронности и бизнес логики
-//func main() {
-//	var wg sync.WaitGroup
-//	wg.Add(2)
-//
-//	go func() {
-//		defer wg.Done()
-//		say(1, "go is awesome")
-//	}()
-//
-//	go func() {
-//		defer wg.Done()
-//		say(2, "cats are cute")
-//	}()
-//
-//	wg.Wait()
-//}
-//
-//func say(id int, phrase string) {
-//	for _, word := range strings.Fields(phrase) {
-//		fmt.Printf("Worker #%d says: %s...\n", id, word)
-//		dur := time.Duration(rand.Intn(100)) * time.Millisecond
-//		time.Sleep(dur)
-//	}
-//}
+// asStats converts stats from sync.Map to ordinary map
+func asStats(m *sync.Map) counter {
+	stats := counter{}
+	m.Range(func(word, count any) bool {
+		stats[word.(string)] = count.(int)
+		return true
+	})
+	return stats
+}
+
+// printStats prints words and their digit counts
+func printStats(stats counter) {
+	for word, count := range stats {
+		fmt.Printf("%s: %d\n", word, count)
+	}
+}
+
+func main() {
+	phrase := "0ne 1wo thr33 4068"
+	counts := countDigitsInWords(phrase)
+	printStats(counts)
+}
