@@ -3,34 +3,42 @@ package main
 import (
 	"fmt"
 	"strings"
-	"sync"
+	"time"
 	"unicode"
 )
 
-// counter stores the number of digits in each word.
-// each key is a word and value is the number of digits in the word.
+// counter хранит количество цифр в каждом слове.
+// ключ карты - слово, а значение - количество цифр в слове.
 type counter map[string]int
 
-// countDigitsInWords counts digits in pharse words
+// countDigitsInWords считает количество цифр в словах фразы
 func countDigitsInWords(phrase string) counter {
 	words := strings.Fields(phrase)
-	syncStats := sync.Map{}
+	counted := make(chan int)
 
-	var wg sync.WaitGroup
-	wg.Add(len(words))
+	// начало решения
+	var stats counter
+	word := make(chan string)
+	go func() {
+		for _, w := range words {
+			counted <- countDigits(w)
+			word <- w
+		}
+	}()
+	<-counted
 
-	for _, word := range words {
-		go func(w string) {
-			defer wg.Done()
-			syncStats.Store(w, countDigits(w))
-		}(word)
-	}
-	wg.Wait()
+	go func(c counter) {
+		fmt.Println(<-word)
+		c[<-word] = <-counted
+	}(stats)
 
-	return asStats(&syncStats)
+	time.Sleep(5000 * time.Millisecond)
+	// конец решения
+
+	return stats
 }
 
-// countDigits returns the number of digits in a string
+// countDigits возвращает количество цифр в строке
 func countDigits(str string) int {
 	count := 0
 	for _, char := range str {
@@ -41,17 +49,7 @@ func countDigits(str string) int {
 	return count
 }
 
-// asStats converts stats from sync.Map to ordinary map
-func asStats(m *sync.Map) counter {
-	stats := counter{}
-	m.Range(func(word, count any) bool {
-		stats[word.(string)] = count.(int)
-		return true
-	})
-	return stats
-}
-
-// printStats prints words and their digit counts
+// printStats печатает слова и количество цифр в каждом
 func printStats(stats counter) {
 	for word, count := range stats {
 		fmt.Printf("%s: %d\n", word, count)
@@ -60,6 +58,6 @@ func printStats(stats counter) {
 
 func main() {
 	phrase := "0ne 1wo thr33 4068"
-	counts := countDigitsInWords(phrase)
-	printStats(counts)
+	stats := countDigitsInWords(phrase)
+	printStats(stats)
 }
