@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-	"time"
 	"unicode"
 )
 
@@ -17,22 +16,22 @@ func countDigitsInWords(phrase string) counter {
 	counted := make(chan int)
 
 	// начало решения
-	var stats counter
 	word := make(chan string)
-	go func() {
-		for _, w := range words {
-			counted <- countDigits(w)
+	m := make(map[string]int)
+
+	for _, w := range words {
+		go func(w string) {
 			word <- w
-		}
-	}()
-	<-counted
+			counted <- countDigits(w)
+		}(w)
+	}
 
-	go func(c counter) {
-		fmt.Println(<-word)
-		c[<-word] = <-counted
-	}(stats)
+	for i := 0; i < len(words); i++ {
+		m[<-word] = <-counted
+	}
 
-	time.Sleep(5000 * time.Millisecond)
+	var stats counter
+	stats = m
 	// конец решения
 
 	return stats
