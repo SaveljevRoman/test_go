@@ -16,22 +16,17 @@ func countDigitsInWords(phrase string) counter {
 	counted := make(chan int)
 
 	// начало решения
-	word := make(chan string)
-	m := make(map[string]int)
+	go func() {
+		for _, word := range words {
+			counted <- countDigits(word)
+		}
+	}()
 
-	for _, w := range words {
-		go func(w string) {
-			word <- w
-			counted <- countDigits(w)
-		}(w)
+	stats := counter{}
+	for _, word := range words {
+		stats[word] = <-counted
 	}
 
-	for i := 0; i < len(words); i++ {
-		m[<-word] = <-counted
-	}
-
-	var stats counter
-	stats = m
 	// конец решения
 
 	return stats
