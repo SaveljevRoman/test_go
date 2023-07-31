@@ -22,19 +22,39 @@ type pair struct {
 // countDigitsInWords считает количество цифр в словах,
 // выбирая очередные слова с помощью next()
 func countDigitsInWords(next nextFunc) counter {
+	pending := make(chan string)
 	counted := make(chan pair)
 
 	// начало решения
+	// отправляет слова на подсчет
 	go func() {
+		// Пройдите по словам и отправьте их
+		// в канал pending
 		for {
-			w := next()
-			counted <- pair{w, countDigits(w)}
-			if w == "" {
+			word := next()
+			pending <- word
+			if word == "" {
 				break
 			}
 		}
 	}()
 
+	// считает цифры в словах
+	go func() {
+		// Считайте слова из канала pending,
+		// посчитайте количество цифр в каждом,
+		// и запишите его в канал counted
+		for {
+			word := <-pending
+			counted <- pair{word, countDigits(word)}
+			if word == "" {
+				break
+			}
+		}
+	}()
+
+	// Считайте значения из канала counted
+	// и заполните stats.
 	stats := counter{}
 	for {
 		p := <-counted
@@ -43,6 +63,8 @@ func countDigitsInWords(next nextFunc) counter {
 		}
 		stats[p.word] = p.count
 	}
+	// В результате stats должна содержать слова
+	// и количество цифр в каждом.
 	// конец решения
 
 	return stats
