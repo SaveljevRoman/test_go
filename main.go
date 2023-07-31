@@ -6,27 +6,43 @@ import (
 	"unicode"
 )
 
+// nextFunc возвращает следующее слово из генератора
+type nextFunc func() string
+
 // counter хранит количество цифр в каждом слове.
 // ключ карты - слово, а значение - количество цифр в слове.
 type counter map[string]int
 
-// countDigitsInWords считает количество цифр в словах фразы
-func countDigitsInWords(phrase string) counter {
-	words := strings.Fields(phrase)
-	counted := make(chan int)
+// pair хранит слово и количество цифр в нем
+type pair struct {
+	word  string
+	count int
+}
+
+// countDigitsInWords считает количество цифр в словах,
+// выбирая очередные слова с помощью next()
+func countDigitsInWords(next nextFunc) counter {
+	counted := make(chan pair)
 
 	// начало решения
 	go func() {
-		for _, word := range words {
-			counted <- countDigits(word)
+		for {
+			w := next()
+			counted <- pair{w, countDigits(w)}
+			if w == "" {
+				break
+			}
 		}
 	}()
 
 	stats := counter{}
-	for _, word := range words {
-		stats[word] = <-counted
+	for {
+		p := <-counted
+		if p.word == "" {
+			break
+		}
+		stats[p.word] = p.count
 	}
-
 	// конец решения
 
 	return stats
@@ -50,8 +66,23 @@ func printStats(stats counter) {
 	}
 }
 
+// wordGenerator возвращает генератор, который выдает слова из фразы
+func wordGenerator(phrase string) nextFunc {
+	words := strings.Fields(phrase)
+	idx := 0
+	return func() string {
+		if idx == len(words) {
+			return ""
+		}
+		word := words[idx]
+		idx++
+		return word
+	}
+}
+
 func main() {
 	phrase := "0ne 1wo thr33 4068"
-	stats := countDigitsInWords(phrase)
+	next := wordGenerator(phrase)
+	stats := countDigitsInWords(next)
 	printStats(stats)
 }
