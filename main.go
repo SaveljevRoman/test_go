@@ -3,102 +3,65 @@ package main
 import (
 	"fmt"
 	"strings"
-	"unicode"
 )
 
-// nextFunc возвращает следующее слово из генератора
-type nextFunc func() string
+// encode кодирует строку шифром Цезаря
+func encode(str string) string {
+	// начало решения
 
-// counter хранит количество цифр в каждом слове.
-// ключ карты - слово, а значение - количество цифр в слове.
-type counter map[string]int
+	submitter := func(str string) <-chan string {
+		ch := make(chan string)
+		go func() {
+			words := strings.Fields(str)
+			for _, word := range words {
+				ch <- word
+			}
+			close(ch)
+		}()
+		return ch
+	}
 
-// pair хранит слово и количество цифр в нем
-type pair struct {
-	word  string
-	count int
-}
+	encoder := func(ch1 <-chan string) <-chan string {
+		ch2 := make(chan string)
+		go func() {
+			for word := range ch1 {
+				ch2 <- encodeWord(word)
+			}
+			close(ch2)
+		}()
+		return ch2
+	}
 
-// countDigitsInWords считает количество цифр в словах,
-// выбирая очередные слова с помощью next()
-func countDigitsInWords(next nextFunc) counter {
-	pending := make(chan string)
-	go submitWords(next, pending)
-
-	counted := make(chan pair)
-	go countWords(pending, counted)
-
-	return fillStats(counted)
-}
-
-// начало решения
-
-// submitWords отправляет слова на подсчет
-func submitWords(next nextFunc, out chan string) {
-	for {
-		word := next()
-		if word == "" {
-			break
+	receiver := func(ch <-chan string) []string {
+		var words []string
+		for word := range ch {
+			words = append(words, word)
 		}
-		out <- word
+		return words
 	}
-	close(out)
+
+	// конец решения
+
+	pending := submitter(str)
+	encoded := encoder(pending)
+	words := receiver(encoded)
+	return strings.Join(words, " ")
 }
 
-// countWords считает цифры в словах
-func countWords(in chan string, out chan pair) {
-	for word := range in {
-		out <- pair{word, countDigits(word)}
+// encodeWord кодирует слово шифром Цезаря
+func encodeWord(word string) string {
+	const shift = 13
+	const char_a byte = 'a'
+	encoded := make([]byte, len(word))
+	for idx, char := range []byte(word) {
+		delta := (char - char_a + shift) % 26
+		encoded[idx] = char_a + delta
 	}
-	close(out)
-}
-
-// fillStats готовит итоговую статистику
-func fillStats(in chan pair) counter {
-	stats := counter{}
-	for p := range in {
-		stats[p.word] = p.count
-	}
-	return stats
-}
-
-// конец решения
-
-// countDigits возвращает количество цифр в строке
-func countDigits(str string) int {
-	count := 0
-	for _, char := range str {
-		if unicode.IsDigit(char) {
-			count++
-		}
-	}
-	return count
-}
-
-// printStats печатает слова и количество цифр в каждом
-func printStats(stats counter) {
-	for word, count := range stats {
-		fmt.Printf("%s: %d\n", word, count)
-	}
-}
-
-// wordGenerator возвращает генератор, который выдает слова из фразы
-func wordGenerator(phrase string) nextFunc {
-	words := strings.Fields(phrase)
-	idx := 0
-	return func() string {
-		if idx == len(words) {
-			return ""
-		}
-		word := words[idx]
-		idx++
-		return word
-	}
+	return string(encoded)
 }
 
 func main() {
-	phrase := "0ne 1wo thr33 4068"
-	next := wordGenerator(phrase)
-	stats := countDigitsInWords(next)
-	printStats(stats)
+	src := "go is awesome"
+	res := encode(src)
+	fmt.Println(res)
 }
