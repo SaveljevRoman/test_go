@@ -22,31 +22,47 @@ type pair struct {
 // countDigitsInWords считает количество цифр в словах,
 // выбирая очередные слова с помощью next()
 func countDigitsInWords(next nextFunc) counter {
+	pending := make(chan string)
+	go submitWords(next, pending)
+
 	counted := make(chan pair)
+	go countWords(pending, counted)
 
-	// начало решения
-	go func() {
-		for {
-			w := next()
-			counted <- pair{w, countDigits(w)}
-			if w == "" {
-				break
-			}
-		}
-	}()
+	return fillStats(counted)
+}
 
-	stats := counter{}
+// начало решения
+
+// submitWords отправляет слова на подсчет
+func submitWords(next nextFunc, out chan string) {
 	for {
-		p := <-counted
-		if p.word == "" {
+		word := next()
+		if word == "" {
 			break
 		}
+		out <- word
+	}
+	close(out)
+}
+
+// countWords считает цифры в словах
+func countWords(in chan string, out chan pair) {
+	for word := range in {
+		out <- pair{word, countDigits(word)}
+	}
+	close(out)
+}
+
+// fillStats готовит итоговую статистику
+func fillStats(in chan pair) counter {
+	stats := counter{}
+	for p := range in {
 		stats[p.word] = p.count
 	}
-	// конец решения
-
 	return stats
 }
+
+// конец решения
 
 // countDigits возвращает количество цифр в строке
 func countDigits(str string) int {
