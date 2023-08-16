@@ -40,6 +40,9 @@ func countDigitsInWords(next nextFunc) counter {
 	// окончания обработки и закрыть канал counted
 	go func() {
 		<-done
+		<-done
+		<-done
+		<-done
 		close(counted)
 	}()
 	// конец решения
