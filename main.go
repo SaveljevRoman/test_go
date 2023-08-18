@@ -2,118 +2,37 @@ package main
 
 import (
 	"fmt"
-	"strings"
-	"unicode"
+	"time"
 )
 
-// nextFunc возвращает следующее слово из генератора
-type nextFunc func() string
-
-// counter хранит количество цифр в каждом слове.
-// ключ карты - слово, а значение - количество цифр в слове.
-type counter map[string]int
-
-// pair хранит слово и количество цифр в нем
-type pair struct {
-	word  string
-	count int
-}
-
-// countDigitsInWords считает количество цифр в словах,
-// выбирая очередные слова с помощью next()
-func countDigitsInWords(next nextFunc) counter {
-	pending := make(chan string)
-	go submitWords(next, pending)
-
-	done := make(chan struct{})
-	counted := make(chan pair)
-
+// gather выполняет переданные функции одновременно
+// и возвращает срез с результатами, когда они готовы
+func gather(funcs []func() any) []any {
 	// начало решения
-
-	// запустите четыре горутины countWords()
-	// вместо одной
-	go countWords(done, pending, counted)
-	go countWords(done, pending, counted)
-	go countWords(done, pending, counted)
-	go countWords(done, pending, counted)
-	// используйте канал завершения, чтобы дождаться
-	// окончания обработки и закрыть канал counted
-	go func() {
-		<-done
-		<-done
-		<-done
-		<-done
-		close(counted)
-	}()
+	res := make([]any, len(funcs))
+	for k, f := range funcs {
+		res[k] = f()
+	}
+	return res
 	// конец решения
-
-	return fillStats(counted)
 }
 
-// submitWords отправляет слова на подсчет
-func submitWords(next nextFunc, out chan<- string) {
-	for {
-		word := next()
-		if word == "" {
-			break
-		}
-		out <- word
-	}
-	close(out)
-}
-
-// countWords считает цифры в словах
-func countWords(done chan<- struct{}, in <-chan string, out chan<- pair) {
-	for word := range in {
-		out <- pair{word, countDigits(word)}
-	}
-	done <- struct{}{}
-}
-
-// fillStats готовит итоговую статистику
-func fillStats(in <-chan pair) counter {
-	stats := counter{}
-	for p := range in {
-		stats[p.word] = p.count
-	}
-	return stats
-}
-
-// countDigits возвращает количество цифр в строке
-func countDigits(str string) int {
-	count := 0
-	for _, char := range str {
-		if unicode.IsDigit(char) {
-			count++
-		}
-	}
-	return count
-}
-
-// printStats печатает слова и количество цифр в каждом
-func printStats(stats counter) {
-	for word, count := range stats {
-		fmt.Printf("%s: %d\n", word, count)
-	}
-}
-
-// wordGenerator возвращает генератор, который выдает слова из фразы
-func wordGenerator(phrase string) nextFunc {
-	words := strings.Fields(phrase)
-	idx := 0
-	return func() string {
-		if idx == len(words) {
-			return ""
-		}
-		word := words[idx]
-		idx++
-		return word
+// squared возвращает функцию,
+// которая считает квадрат n
+func squared(n int) func() any {
+	return func() any {
+		time.Sleep(time.Duration(n) * 100 * time.Millisecond)
+		return n * n
 	}
 }
 
 func main() {
-	phrase := "1 22 333 4444 55555 666666 7777777 88888888"
-	next := wordGenerator(phrase)
-	stats := countDigitsInWords(next)
-	printStats(stats)
+	funcs := []func() any{squared(2), squared(3), squared(4)}
+
+	start := time.Now()
+	nums := gather(funcs)
+	elapsed := float64(time.Since(start)) / 1_000_000
+
+	fmt.Println(nums)
+	fmt.Printf("Took %.0f ms\n", elapsed)
 }
