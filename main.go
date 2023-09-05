@@ -8,13 +8,22 @@ import (
 // gather выполняет переданные функции одновременно
 // и возвращает срез с результатами, когда они готовы
 func gather(funcs []func() any) []any {
-	// начало решения
+	done := make(chan struct{})
 	res := make([]any, len(funcs))
+
 	for k, f := range funcs {
-		res[k] = f()
+		k, f := k, f
+		go func() {
+			res[k] = f()
+			done <- struct{}{}
+		}()
 	}
+
+	for i := 0; i < len(funcs); i++ {
+		<-done
+	}
+
 	return res
-	// конец решения
 }
 
 // squared возвращает функцию,
