@@ -34,14 +34,15 @@ func makePool(n int, handler func(int, string)) (func(string), func()) {
 	// и обрабатывает переданную фразу через handler()
 	handle := func(phrase string) {
 		id := <-pool
-		go say(id, phrase)
+		go handler(id, phrase)
+		pool <- id
 	}
 
 	// wait() дожидается, пока все токены вернутся в пул
 	wait := func() {
-		for i := 0; i < n; i++ {
-			pool <- i
-		}
+		<-pool
+		<-pool
+		<-pool
 	}
 	// конец решения
 
