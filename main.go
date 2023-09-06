@@ -2,46 +2,64 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
+	"strings"
 	"time"
 )
 
-// gather выполняет переданные функции одновременно
-// и возвращает срез с результатами, когда они готовы
-func gather(funcs []func() any) []any {
-	done := make(chan struct{})
-	res := make([]any, len(funcs))
-
-	for k, f := range funcs {
-		k, f := k, f
-		go func() {
-			res[k] = f()
-			done <- struct{}{}
-		}()
+// say печатает фразу от имени обработчика
+func say(id int, phrase string) {
+	for _, word := range strings.Fields(phrase) {
+		fmt.Printf("Worker #%d says: %s...\n", id, word)
+		dur := time.Duration(rand.Intn(100)) * time.Millisecond
+		time.Sleep(dur)
 	}
-
-	for i := 0; i < len(funcs); i++ {
-		<-done
-	}
-
-	return res
 }
 
-// squared возвращает функцию,
-// которая считает квадрат n
-func squared(n int) func() any {
-	return func() any {
-		time.Sleep(time.Duration(n) * 100 * time.Millisecond)
-		return n * n
+// makePool создает пул на n обработчиков
+// возвращает функции handle и wait
+func makePool(n int, handler func(int, string)) (func(string), func()) {
+	// начало решения
+
+	// создайте пул на n обработчиков
+	// используйте для канала имя pool и тип chan int
+	pool := make(chan int, n)
+	for i := 0; i < n; i++ {
+		pool <- i
 	}
+
+	// определите функции handle() и wait()
+
+	// handle() выбирает токен из пула
+	// и обрабатывает переданную фразу через handler()
+	handle := func(phrase string) {
+		id := <-pool
+		go say(id, phrase)
+	}
+
+	// wait() дожидается, пока все токены вернутся в пул
+	wait := func() {
+		for i := 0; i < n; i++ {
+			pool <- i
+		}
+	}
+	// конец решения
+
+	return handle, wait
 }
 
 func main() {
-	funcs := []func() any{squared(2), squared(3), squared(4)}
+	phrases := []string{
+		"go is awesome",
+		"cats are cute",
+		"rain is wet",
+		"channels are hard",
+		"floor is lava",
+	}
 
-	start := time.Now()
-	nums := gather(funcs)
-	elapsed := float64(time.Since(start)) / 1_000_000
-
-	fmt.Println(nums)
-	fmt.Printf("Took %.0f ms\n", elapsed)
+	handle, wait := makePool(2, say)
+	for _, phrase := range phrases {
+		handle(phrase)
+	}
+	wait()
 }
