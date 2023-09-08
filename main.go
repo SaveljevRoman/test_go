@@ -20,7 +20,6 @@ func say(id int, phrase string) {
 // возвращает функции handle и wait
 func makePool(n int, handler func(int, string)) (func(string), func()) {
 	// начало решения
-
 	// создайте пул на n обработчиков
 	// используйте для канала имя pool и тип chan int
 	pool := make(chan int, n)
@@ -34,15 +33,18 @@ func makePool(n int, handler func(int, string)) (func(string), func()) {
 	// и обрабатывает переданную фразу через handler()
 	handle := func(phrase string) {
 		id := <-pool
-		go handler(id, phrase)
-		pool <- id
+		go func() {
+			handler(id, phrase)
+			pool <- id
+		}()
+
 	}
 
 	// wait() дожидается, пока все токены вернутся в пул
 	wait := func() {
-		<-pool
-		<-pool
-		<-pool
+		for i := 0; i < n; i++ {
+			<-pool
+		}
 	}
 	// конец решения
 
