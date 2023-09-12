@@ -2,67 +2,52 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
-	"strings"
-	"time"
 )
 
-// say печатает фразу от имени обработчика
-func say(id int, phrase string) {
-	for _, word := range strings.Fields(phrase) {
-		fmt.Printf("Worker #%d says: %s...\n", id, word)
-		dur := time.Duration(rand.Intn(100)) * time.Millisecond
-		time.Sleep(dur)
-	}
-}
+// начало решения
 
-// makePool создает пул на n обработчиков
-// возвращает функции handle и wait
-func makePool(n int, handler func(int, string)) (func(string), func()) {
-	// начало решения
-	// создайте пул на n обработчиков
-	// используйте для канала имя pool и тип chan int
-	pool := make(chan int, n)
-	for i := 0; i < n; i++ {
-		pool <- i
-	}
-
-	// определите функции handle() и wait()
-
-	// handle() выбирает токен из пула
-	// и обрабатывает переданную фразу через handler()
-	handle := func(phrase string) {
-		id := <-pool
-		go func() {
-			handler(id, phrase)
-			pool <- id
-		}()
-
-	}
-
-	// wait() дожидается, пока все токены вернутся в пул
-	wait := func() {
-		for i := 0; i < n; i++ {
-			<-pool
+// count отправляет в канал числа от start до бесконечности
+func count(cancel <-chan struct{}, start int) <-chan int {
+	out := make(chan int)
+	go func() {
+		defer close(out)
+		for i := start; ; i++ {
+			select {
+			case out <- i:
+			case <-cancel:
+				return
+			}
 		}
-	}
-	// конец решения
-
-	return handle, wait
+	}()
+	return out
 }
+
+// take выбирает первые n чисел из in и отправляет в выходной канал
+func take(cancel <-chan struct{}, in <-chan int, n int) <-chan int {
+	out := make(chan int)
+	go func() {
+		defer close(out)
+		for i := 0; i < n; i++ {
+			select {
+			case out <- <-in:
+			case <-cancel:
+				return
+			}
+		}
+	}()
+	return out
+}
+
+// конец решения
 
 func main() {
-	phrases := []string{
-		"go is awesome",
-		"cats are cute",
-		"rain is wet",
-		"channels are hard",
-		"floor is lava",
-	}
+	cancel := make(chan struct{})
+	defer close(cancel)
 
-	handle, wait := makePool(2, say)
-	for _, phrase := range phrases {
-		handle(phrase)
-	}
-	wait()
+	stream := take(cancel, count(cancel, 10), 5)
+	first := <-stream
+	second := <-stream
+	third := <-stream
+
+	fmt.Println(first, second, third)
 }
