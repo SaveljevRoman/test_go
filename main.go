@@ -1,65 +1,76 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"sync"
-	"time"
 )
 
-// rangeGen отправляет в канал числа от start до stop-1
-func rangeGen(start, stop int) <-chan int {
-	out := make(chan int)
-	go func() {
-		defer close(out)
-		for i := start; i < stop; i++ {
-			time.Sleep(50 * time.Millisecond)
-			out <- i
-		}
-
-	}()
-	return out
-}
+var ErrFull = errors.New("Queue is full")
+var ErrEmpty = errors.New("Queue is empty")
 
 // начало решения
 
-// merge выбирает числа из входных каналов и отправляет в выходной
-func merge(channels ...<-chan int) <-chan int {
-	// объедините все исходные каналы в один выходной
-	// последовательное объединение НЕ подходит
-	var wg sync.WaitGroup
-	wg.Add(len(channels))
-	out := make(chan int)
+// Queue - FIFO-очередь на n элементов
+type Queue struct {
+	val chan int
+}
 
-	for _, channel := range channels {
-		ch := channel
-		go func() {
-			defer wg.Done()
-			for val := range ch {
-				out <- val
-			}
-		}()
+// Get возвращает очередной элемент.
+// Если элементов нет и block = false -
+// возвращает ошибку.
+func (q Queue) Get(block bool) (int, error) {
+	if block {
+		return 0, ErrEmpty
 	}
+	var val int
+	select {
+	case val = <-q.val:
+		return val, nil
+	default:
+		return 0, ErrEmpty
+	}
+}
 
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
+// Put помещает элемент в очередь.
+// Если очередь заполнения и block = false -
+// возвращает ошибку.
+func (q Queue) Put(val int, block bool) error {
+	if block {
+		return ErrFull
+	}
+	select {
+	case q.val <- val:
+		return nil
+	default:
+		return ErrFull
+	}
+}
 
-	return out
+// MakeQueue создает новую очередь
+func MakeQueue(n int) Queue {
+	return Queue{val: make(chan int, n)}
 }
 
 // конец решения
 
 func main() {
-	in1 := rangeGen(11, 15)
-	in2 := rangeGen(21, 25)
-	in3 := rangeGen(31, 35)
+	q := MakeQueue(2)
 
-	start := time.Now()
-	merged := merge(in1, in2, in3)
-	for val := range merged {
-		fmt.Print(val, " ")
-	}
-	fmt.Println()
-	fmt.Println("Took", time.Since(start))
+	err := q.Put(1, false)
+	fmt.Println("put 1:", err)
+
+	err = q.Put(2, false)
+	fmt.Println("put 2:", err)
+
+	err = q.Put(3, false)
+	fmt.Println("put 3:", err)
+
+	res, err := q.Get(false)
+	fmt.Println("get:", res, err)
+
+	res, err = q.Get(false)
+	fmt.Println("get:", res, err)
+
+	res, err = q.Get(false)
+	fmt.Println("get:", res, err)
 }
