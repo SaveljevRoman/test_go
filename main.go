@@ -22,9 +22,8 @@ func (q Queue) Get(block bool) (int, error) {
 	if block {
 		return 0, ErrEmpty
 	}
-	var val int
 	select {
-	case val = <-q.val:
+	case val := <-q.val:
 		return val, nil
 	default:
 		return 0, ErrEmpty
