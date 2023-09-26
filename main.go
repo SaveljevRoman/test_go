@@ -20,14 +20,21 @@ type Queue struct {
 // возвращает ошибку.
 func (q Queue) Get(block bool) (int, error) {
 	if block {
-		return 0, ErrEmpty
+		select {
+		case val := <-q.val:
+			return val, nil
+		}
 	}
-	select {
-	case val := <-q.val:
-		return val, nil
-	default:
-		return 0, ErrEmpty
+	if !block {
+		select {
+		case val := <-q.val:
+			return val, nil
+		default:
+			return 0, ErrEmpty
+		}
 	}
+
+	return 0, ErrEmpty
 }
 
 // Put помещает элемент в очередь.
@@ -35,14 +42,21 @@ func (q Queue) Get(block bool) (int, error) {
 // возвращает ошибку.
 func (q Queue) Put(val int, block bool) error {
 	if block {
-		return ErrFull
+		select {
+		case q.val <- val:
+			return nil
+		}
 	}
-	select {
-	case q.val <- val:
-		return nil
-	default:
-		return ErrFull
+
+	if !block {
+		select {
+		case q.val <- val:
+			return nil
+		default:
+			return ErrFull
+		}
 	}
+	return ErrFull
 }
 
 // MakeQueue создает новую очередь
