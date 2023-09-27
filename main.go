@@ -3,87 +3,64 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math/rand"
+	"time"
 )
 
-var ErrFull = errors.New("Queue is full")
-var ErrEmpty = errors.New("Queue is empty")
+// выполняет какую-то операцию,
+// обычно быстро, но иногда медленно
+func work() int {
+	if rand.Intn(10) < 8 {
+		time.Sleep(10 * time.Millisecond)
+	} else {
+		time.Sleep(200 * time.Millisecond)
+	}
+	return 42
+}
+
+// выполняет функцию fn() c таймаутом timeout и возвращает результат
+// если в течение timeout функция не вернула ответ - возвращает ошибку
+func withTimeout(fn func() int, timeout time.Duration) (int, error) {
+	var result int
+
+	done := make(chan struct{})
+	go func() {
+		result = fn()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return result, nil
+	case <-after(timeout):
+		return 0, errors.New("timeout")
+	}
+}
 
 // начало решения
 
-// Queue - FIFO-очередь на n элементов
-type Queue struct {
-	val chan int
-}
+// возвращает канал, в котором появится значение
+// через промежуток времени dur
+func after(dur time.Duration) <-chan time.Time {
+	ch := make(chan time.Time, 1)
 
-// Get возвращает очередной элемент.
-// Если элементов нет и block = false -
-// возвращает ошибку.
-func (q Queue) Get(block bool) (int, error) {
-	if block {
-		select {
-		case val := <-q.val:
-			return val, nil
-		}
-	}
-	if !block {
-		select {
-		case val := <-q.val:
-			return val, nil
-		default:
-			return 0, ErrEmpty
-		}
-	}
-
-	return 0, ErrEmpty
-}
-
-// Put помещает элемент в очередь.
-// Если очередь заполнения и block = false -
-// возвращает ошибку.
-func (q Queue) Put(val int, block bool) error {
-	if block {
-		select {
-		case q.val <- val:
-			return nil
-		}
-	}
-
-	if !block {
-		select {
-		case q.val <- val:
-			return nil
-		default:
-			return ErrFull
-		}
-	}
-	return ErrFull
-}
-
-// MakeQueue создает новую очередь
-func MakeQueue(n int) Queue {
-	return Queue{val: make(chan int, n)}
+	go func() {
+		time.Sleep(dur)
+		ch <- time.Now()
+	}()
+	return ch
 }
 
 // конец решения
 
 func main() {
-	q := MakeQueue(2)
-
-	err := q.Put(1, false)
-	fmt.Println("put 1:", err)
-
-	err = q.Put(2, false)
-	fmt.Println("put 2:", err)
-
-	err = q.Put(3, false)
-	fmt.Println("put 3:", err)
-
-	res, err := q.Get(false)
-	fmt.Println("get:", res, err)
-
-	res, err = q.Get(false)
-	fmt.Println("get:", res, err)
-
-	res, err = q.Get(false)
-	fmt.Println("get:", res, err)
+	for i := 0; i < 10; i++ {
+		start := time.Now()
+		timeout := 50 * time.Millisecond
+		if answer, err := withTimeout(work, timeout); err != nil {
+			fmt.Printf("Took %v. Error: %v\n", time.Since(start), err)
+		} else {
+			fmt.Printf("Took %v. Result: %v\n", time.Since(start), answer)
+		}
+	}
 }
